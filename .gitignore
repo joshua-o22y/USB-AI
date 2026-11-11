@@ -1,0 +1,7 @@
+dist/
+.system/
+models/
+data/
+*.tmp
+usb-ai
+usb-ai.exe

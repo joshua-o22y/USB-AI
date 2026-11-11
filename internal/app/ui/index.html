@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USB-AI — Zero-Trace Portable Local AI</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --bg-elev: #111827;
+      --bg-card: #161f33;
+      --bg-hover: #1e2942;
+      --border: #26324d;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #818cf8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #c084fc;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      background: radial-gradient(circle at 15% 0%, #131d36 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+    button, input, select, textarea {
+      font-family: inherit;
+      color: inherit;
+    }
+    .unplug-banner {
+      display: none;
+      background: linear-gradient(90deg, #991b1b, #dc2626, #991b1b);
+      color: #fff;
+      padding: 12px 20px;
+      font-weight: 700;
+      font-size: 14px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 2px solid #fca5a5;
+      animation: pulseRed 1.5s infinite alternate;
+      z-index: 100;
+    }
+    .unplug-banner.active { display: flex; }
+    @keyframes pulseRed {
+      from { box-shadow: 0 0 10px rgba(239,68,68,0.4); }
+      to   { box-shadow: 0 0 28px rgba(239,68,68,0.9); }
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 10px 18px;
+      background: rgba(17, 24, 39, 0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: -0.3px;
+    }
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #06101f;
+      font-weight: 900;
+      font-size: 15px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+      display: block;
+    }
+    .top-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.amber { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+    .dot.red   { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+    .dot.purple { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+
+    .net-switch {
+      display: inline-flex;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .net-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .net-btn.active {
+      background: var(--bg-hover);
+      color: var(--text);
+      border: 1px solid var(--accent);
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { background: var(--bg-hover); border-color: #3b4d71; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #06101f;
+      border: none;
+      font-weight: 700;
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.14);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+    }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
+
+    /* Center screens (Login / Setup / Ejected) */
+    .center-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: rgba(22, 31, 51, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 26px;
+      width: 100%;
+      max-width: 540px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.45);
+    }
+    .card-wide { max-width: 980px; }
+    .card h1 { font-size: 22px; margin-bottom: 6px; }
+    .card p.sub { color: var(--muted); font-size: 13.5px; margin-bottom: 18px; line-height: 1.5; }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .input, select.input, textarea.input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: #0d1424;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+    .user-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .user-chip {
+      padding: 7px 12px;
+      border-radius: 9px;
+      background: #0d1424;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .user-chip.active, .user-chip:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .hw-banner {
+      background: #0d1424;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+    }
+    .hw-stat span {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .hw-stat strong {
+      font-size: 14px;
+      color: var(--text);
+    }
+    .model-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin: 12px 0 18px;
+    }
+    .model-card {
+      background: #0d1424;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .model-card:hover { border-color: #475d8c; }
+    .model-card.selected {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.08);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-fast { background: rgba(34,197,94,0.16); color: #4ade80; }
+    .badge-hybrid { background: rgba(192,132,252,0.18); color: #d8b4fe; }
+    .badge-playable { background: rgba(245,158,11,0.16); color: #fbbf24; }
+    .badge-heavy { background: rgba(239,68,68,0.16); color: #f87171; }
+    .badge-moe { background: rgba(56,189,248,0.18); color: #38bdf8; }
+    .badge-top { background: linear-gradient(135deg, #f59e0b, #ec4899); color: #fff; }
+
+    /* Workspace layout */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 270px 1fr;
+      min-height: 0;
+      height: calc(100vh - 58px);
+    }
+    .sidebar {
+      background: rgba(13, 20, 36, 0.9);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    .nav-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-tab {
+      border: 1px solid transparent;
+      background: transparent;
+      text-align: left;
+      padding: 9px 12px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .nav-tab.active, .nav-tab:hover {
+      background: var(--bg-card);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .chat-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .chat-item {
+      padding: 9px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      color: var(--muted);
+      border: 1px solid transparent;
+    }
+    .chat-item.active, .chat-item:hover {
+      background: var(--bg-card);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .chat-item-title {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .main-pane {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+    .chat-header {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: rgba(17, 24, 39, 0.6);
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .msg {
+      max-width: 820px;
+      padding: 13px 16px;
+      border-radius: 13px;
+      line-height: 1.55;
+      font-size: 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #0284c7, #4f46e5);
+      color: #fff;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    .msg-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .composer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: rgba(17, 24, 39, 0.85);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .composer-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .composer textarea {
+      flex: 1;
+      resize: none;
+      height: 54px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0d1424;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .pane-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 22px;
+    }
+    .storage-modes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 10px;
+      margin: 10px 0 16px;
+    }
+    .mode-box {
+      background: #0d1424;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .mode-box.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.1);
+    }
+    .progress-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: #0d1424;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 0.25s;
+    }
+    .error-box {
+      background: rgba(239,68,68,0.14);
+      border: 1px solid rgba(239,68,68,0.45);
+      color: #fca5a5;
+      padding: 10px 12px;
+      border-radius: 9px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 820px) {
+      .workspace { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--border); max-height: 220px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Emergency USB Unplug Warning Banner -->
+  <div id="unplugBanner" class="unplug-banner">
+    <div id="unplugText">
+      ⚠️ USB STICK UNPLUGGED BEFORE SYNC! Your active session & latest messages are safely held in Host RAM. Plug the USB stick back in NOW so you don't lose your data!
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" style="background:#fff;color:#991b1b;border:none;font-weight:800;" onclick="reconnectUSB()">🔌 I Plugged It Back In — Sync Now</button>
+    </div>
+  </div>
+
+  <!-- Top Status & Security Bar -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-icon">AI</div>
+      <div>
+        USB-AI
+        <span class="brand-sub" id="usbPathLabel">Zero-Trace Portable Workspace</span>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <!-- Hardware Tier Pill -->
+      <div class="pill" title="Detected Host PC Hardware — Click to re-scan" style="cursor:pointer" onclick="rescanHardware()">
+        <span class="dot purple"></span>
+        <span id="hwSummaryPill">Scanning PC hardware...</span>
+      </div>
+
+      <!-- 3-Mode Network Firewall Switch -->
+      <div class="net-switch" title="3-Mode Privacy Network Firewall">
+        <button class="net-btn" id="netBtnAirlock" onclick="setNetMode('airlock')">🔒 Airlock</button>
+        <button class="net-btn" id="netBtnHub" onclick="setNetMode('hub')">📦 Model Hub</button>
+        <button class="net-btn" id="netBtnWeb" onclick="setNetMode('web')">🌐 Privacy Web</button>
+      </div>
+
+      <!-- RAM-to-USB Checkpoint Status -->
+      <div class="pill" id="syncPill" title="Chats run in Host RAM and flush atomically to the encrypted USB vault">
+        <span class="dot green" id="syncDot"></span>
+        <span id="syncText">RAM → USB Synced</span>
+      </div>
+
+      <!-- Test USB Yank Button -->
+      <button class="btn" id="simYankBtn" onclick="toggleSimulateYank()" title="Test what happens if the user yanks the USB stick before data finishes syncing">
+        ⚡ Test Unplug Alert
+      </button>
+
+      <!-- Safe Eject Button -->
+      <button class="btn btn-danger" onclick="safeEject()" title="Flush RAM vault to USB, purge ephemeral models, and wipe RAM keys">
+        ⏏️ Safe Eject
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Dynamic View Root -->
+  <div id="appRoot" style="flex:1; display:flex; flex-direction:column; min-height:0;"></div>
+
+<script>
+const state = {
+  data: null,
+  authMode: 'login', // 'login' | 'register'
+  selectedUser: '',
+  authError: '',
+  inSetup: false,
+  setupModel: 'qwen3:4b',
+  setupStorageMode: 'pinned',
+  setupHybrid: true,
+  setupMMap: true,
+  showAllSetupModels: false,
+  activeTab: 'chat', // 'chat' | 'models' | 'vault' | 'settings'
+  activeChatId: '',
+  streaming: false,
+  streamText: '',
+  useWebSearch: false,
+  simYank: false,
+};
+
+async function api(path, body) {
+  const opts = body !== undefined
+    ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    : { method: 'GET' };
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+async function bootstrap() {
+  try {
+    const d = await api('/api/bootstrap');
+    state.data = d;
+    if (d.loggedIn && d.vault) {
+      state.inSetup = !d.vault.settings.completedSetup;
+      if (!state.activeChatId && d.vault.chats && d.vault.chats.length > 0) {
+        state.activeChatId = d.vault.chats[0].id;
+      }
+      if (d.vault.settings.defaultModel) {
+        state.setupModel = d.vault.settings.defaultModel;
+      }
+    } else if (d.users && d.users.length === 0) {
+      state.authMode = 'register';
+    } else if (d.users && d.users.length > 0 && !state.selectedUser) {
+      state.selectedUser = d.users[0].username;
+    }
+    const topRec = (d.models || []).find(m => m.recommended);
+    if (topRec && (!state.setupModel || state.setupModel === 'qwen3:4b')) {
+      state.setupModel = topRec.id;
+    }
+    updateTopBar();
+    render();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function updateTopBar() {
+  const d = state.data;
+  if (!d) return;
+  const hw = d.hardware || {};
+  const vramTxt = hw.bestVramGB > 0 ? ` • ${hw.bestVramGB}GB VRAM` : '';
+  document.getElementById('hwSummaryPill').textContent =
+    `Tier ${hw.tier || 1} (${hw.tierName || 'Host'}): ${hw.ramGB || '?'}GB RAM${vramTxt}`;
+  document.getElementById('usbPathLabel').textContent =
+    `USB: ${d.usbRoot || ''} (${d.usbFreeGB || '?'} GB free)`;
+
+  ['airlock', 'hub', 'web'].forEach(m => {
+    const btn = document.getElementById('netBtn' + m.charAt(0).toUpperCase() + m.slice(1));
+    if (btn) btn.classList.toggle('active', d.networkMode === m);
+  });
+
+  const sync = d.sync || {};
+  const banner = document.getElementById('unplugBanner');
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  const simBtn = document.getElementById('simYankBtn');
+
+  if (!sync.usbConnected) {
+    banner.classList.add('active');
+    document.getElementById('unplugText').textContent =
+      sync.lastError || '⚠️ USB STICK UNPLUGGED! Plug it back in immediately so your RAM session can be saved.';
+    dot.className = 'dot red';
+    txt.textContent = `USB UNPLUGGED (${sync.pendingWrites || 1} unsaved in RAM)`;
+    simBtn.textContent = '🔌 Plug USB Back In';
+  } else {
+    banner.classList.remove('active');
+    simBtn.textContent = '⚡ Test Unplug Alert';
+    if (sync.dirty) {
+      dot.className = 'dot amber';
+      txt.textContent = 'Flushing RAM → USB...';
+    } else {
+      dot.className = 'dot green';
+      txt.textContent = sync.lastSavedAt ? `RAM → USB Saved (${sync.lastSavedAt})` : 'RAM → USB Synced ✅';
+    }
+  }
+}
+
+async function pollStatus() {
+  try {
+    const s = await api('/api/usb/status');
+    if (state.data) {
+      state.data.sync = s.sync;
+      state.data.pulls = s.pulls;
+      state.data.engine = s.engine;
+      state.data.networkMode = s.networkMode;
+      state.data.networkLog = s.networkLog;
+      updateTopBar();
+      if (state.activeTab === 'models' || state.inSetup) {
+        renderPullsInPlace();
+      }
+    }
+  } catch (_) {}
+}
+setInterval(pollStatus, 2000);
+
+function renderPullsInPlace() {
+  const el = document.getElementById('livePullsContainer');
+  if (!el || !state.data) return;
+  el.innerHTML = renderPullsHTML();
+}
+
+function renderPullsHTML() {
+  const pulls = (state.data && state.data.pulls) || [];
+  const eng = (state.data && state.data.engine) || {};
+  let html = '';
+  if (eng.installing) {
+    html += `<div style="background:#0d1424;border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;">
+        <span>⚙️ ${escapeHTML(eng.installStage || 'Installing Portable Ollama Engine...')}</span>
+        <span>${eng.installProgress || 0}%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${eng.installProgress || 5}%"></div></div>
+    </div>`;
+  }
+  for (const p of pulls) {
+    html += `<div style="background:#0d1424;border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;">
+        <span>📥 ${escapeHTML(p.model)} <span class="badge badge-moe">${escapeHTML(p.storageMode)}</span> — ${escapeHTML(p.status)}</span>
+        <span>${p.percent || 0}%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${p.percent || 5}%"></div></div>
+    </div>`;
+  }
+  return html;
+}
+
+function render() {
+  const root = document.getElementById('appRoot');
+  const d = state.data;
+  if (!d) {
+    root.innerHTML = `<div class="center-wrap"><div class="card"><h1>Booting USB-AI Workspace...</h1></div></div>`;
+    return;
+  }
+  if (d.ejected) {
+    root.innerHTML = renderEjected();
+    return;
+  }
+  if (!d.loggedIn) {
+    root.innerHTML = renderAuth();
+    return;
+  }
+  if (state.inSetup) {
+    root.innerHTML = renderSetupWizard();
+    return;
+  }
+  root.innerHTML = renderWorkspace();
+  const msgBox = document.getElementById('messagesScroll');
+  if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
+}
+
+function renderEjected() {
+  return `<div class="center-wrap">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:46px;margin-bottom:10px;">✅</div>
+      <h1>Safe to Unplug USB Stick</h1>
+      <p class="sub">
+        All active user chats and settings were encrypted with <strong>AES-256-GCM</strong> and flushed to the USB stick.<br/>
+        Ephemeral session models were purged, the local engine was stopped, and all decryption keys were wiped from host RAM.
+      </p>
+      <button class="btn btn-primary" onclick="reconnectAfterEject()">🔄 Unlock USB Again</button>
+    </div>
+  </div>`;
+}
+
+function renderAuth() {
+  const d = state.data;
+  const hw = d.hardware || {};
+  const users = d.users || [];
+  const gpus = (hw.gpus && hw.gpus.length)
+    ? hw.gpus.map(g => `${g.name} (${g.vramGB} GB)`).join(', ')
+    : 'Integrated / CPU Mode';
+
+  return `<div class="center-wrap">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h1>🔐 USB-AI Encrypted Login</h1>
+        <span class="badge badge-moe">AES-256-GCM Vault</span>
+      </div>
+      <p class="sub">
+        Your password is the cryptographic key to your personal folder on this USB stick.
+        Everything runs in <strong>Host RAM</strong> and leaves zero trace on this computer.
+      </p>
+
+      <div class="hw-banner">
+        <div class="hw-stat"><span>Host CPU</span><strong>${escapeHTML(hw.cpu || 'CPU')} (${hw.cores} cores)</strong></div>
+        <div class="hw-stat"><span>System RAM</span><strong>${hw.ramGB} GB (${hw.ramFreeGB} GB free)</strong></div>
+        <div class="hw-stat"><span>GPU / Accelerator</span><strong>${escapeHTML(gpus)}</strong></div>
+        <div class="hw-stat"><span>Hardware Power Tier</span><strong>Tier ${hw.tier}: ${escapeHTML(hw.tierName)}</strong></div>
+      </div>
+
+      ${state.authError ? `<div class="error-box">${escapeHTML(state.authError)}</div>` : ''}
+
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn ${state.authMode==='login'?'btn-primary':''}" style="flex:1;justify-content:center;" onclick="switchAuthMode('login')">Unlock Existing Account (${users.length})</button>
+        <button class="btn ${state.authMode==='register'?'btn-primary':''}" style="flex:1;justify-content:center;" onclick="switchAuthMode('register')">+ Create New User on USB</button>
+      </div>
+
+      ${state.authMode === 'login' && users.length > 0 ? `
+        <div class="field">
+          <label>Select User Vault on USB</label>
+          <div class="user-chips">
+            ${users.map(u => `<div class="user-chip ${state.selectedUser===u.username?'active':''}" onclick="selectUser('${escapeAttr(u.username)}')">👤 ${escapeHTML(u.username)}</div>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <form onsubmit="submitAuth(event)">
+        <div class="field">
+          <label>Username</label>
+          <input id="authUser" class="input" required placeholder="e.g. joshua" value="${escapeAttr(state.authMode==='login' ? state.selectedUser : '')}" />
+        </div>
+        <div class="field">
+          <label>Vault Password (min 4 chars — derives your AES-256 key)</label>
+          <input id="authPass" type="password" class="input" required placeholder="Enter your vault password..." autofocus />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;font-size:14px;">
+          ${state.authMode === 'login' ? '🔓 Decrypt Vault into Host RAM' : '✨ Create Encrypted Vault & Start Setup Wizard'}
+        </button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function renderSetupWizard() {
+  const d = state.data;
+  const hw = d.hardware || {};
+  const allModels = d.models || [];
+  const top5 = allModels.filter(m => m.recommended);
+  const shown = state.showAllSetupModels ? allModels : top5;
+  const vault = d.vault || { settings: {} };
+
+  return `<div class="center-wrap">
+    <div class="card card-wide">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+        <h1>🧭 Setup Wizard — Welcome, ${escapeHTML(vault.username)}!</h1>
+        <span class="badge badge-top">Host Scan: Tier ${hw.tier} ${escapeHTML(hw.tierName)}</span>
+      </div>
+      <p class="sub">
+        We scanned this PC (<strong>${escapeHTML(hw.cpu)} • ${hw.ramGB} GB RAM • ${escapeHTML(hw.accelerator)}</strong>)
+        and ranked the <strong>Top 5 AI Models</strong>—including <strong>Mixture-of-Experts (MoE)</strong> models that split across VRAM + System RAM so even laptops can run smart models fast.
+      </p>
+
+      <div id="livePullsContainer">${renderPullsHTML()}</div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:700;font-size:14px;">
+          1. Pick Your Default AI Model (${state.showAllSetupModels ? `Showing All ${allModels.length} Models` : 'Showing Top 5 for This PC'})
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select class="input" style="width:auto;padding:6px 10px;font-size:12.5px;" onchange="selectSetupModel(this.value)">
+            ${allModels.map(m => `<option value="${escapeAttr(m.id)}" ${state.setupModel===m.id?'selected':''}>${m.recommended?'⭐ [Top 5] ':''}${escapeHTML(m.name)} (${m.downloadSizeGB} GB • ${escapeHTML(m.architecture)})</option>`).join('')}
+          </select>
+          <button class="btn" onclick="toggleShowAllModels()">
+            ${state.showAllSetupModels ? 'Show Top 5 Only' : `Browse All (${allModels.length})`}
+          </button>
+        </div>
+      </div>
+
+      <div class="model-grid">
+        ${shown.map(m => renderModelCard(m, state.setupModel === m.id, `selectSetupModel('${escapeAttr(m.id)}')`)).join('')}
+      </div>
+
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px;">
+        2. Choose USB Storage Mode (Saves USB Space!)
+      </div>
+      <div class="storage-modes">
+        <div class="mode-box ${state.setupStorageMode==='pinned'?'active':''}" onclick="setSetupStorageMode('pinned')">
+          <div style="font-weight:700;font-size:13px;">📌 Pinned to USB (Permanent)</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Stays saved on the USB stick permanently for 100% offline instant use anywhere.</div>
+        </div>
+        <div class="mode-box ${state.setupStorageMode==='swap'?'active':''}" onclick="setSetupStorageMode('swap')">
+          <div style="font-weight:700;font-size:13px;">🔄 Auto-Swap Slot (Space Saver)</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Replaces the previous Swap-Slot model automatically so your USB stick never runs out of space.</div>
+        </div>
+        <div class="mode-box ${state.setupStorageMode==='session'?'active':''}" onclick="setSetupStorageMode('session')">
+          <div style="font-weight:700;font-size:13px;">⚡ Ephemeral Session (Auto-Delete)</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">For huge models: runs during this session and automatically deletes itself on Safe Eject.</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px;">
+        <div class="field" style="margin:0;">
+          <label>3. Personal System Instructions</label>
+          <textarea id="setupSysPrompt" class="input" rows="3">${escapeHTML(vault.settings.systemPrompt || '')}</textarea>
+        </div>
+        <div class="field" style="margin:0;">
+          <label>4. Memory & MoE Offloading</label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;color:var(--text);font-size:13px;margin-top:8px;cursor:pointer;">
+            <input type="checkbox" id="setupHybrid" ${state.setupHybrid?'checked':''} />
+            Enable <strong>Hybrid VRAM + System RAM Split</strong> (runs active MoE experts in VRAM & rest in RAM)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;color:var(--text);font-size:13px;margin-top:8px;cursor:pointer;">
+            <input type="checkbox" id="setupMMap" ${state.setupMMap?'checked':''} />
+            Enable <strong>USB mmap Streaming</strong> (streams model weights on-demand without filling RAM)
+          </label>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
+        <button class="btn" onclick="finishSetup(false)">Skip Download & Enter Workspace</button>
+        <button class="btn btn-primary" onclick="finishSetup(true)">🚀 Prepare Selected Model on USB & Launch Workspace</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderModelCard(m, isSelected, onClickJS) {
+  const badgeClass = m.fitBadge === 'fast' ? 'badge-fast'
+    : m.fitBadge === 'hybrid' ? 'badge-hybrid'
+    : m.fitBadge === 'playable' ? 'badge-playable' : 'badge-heavy';
+  return `<div class="model-card ${isSelected?'selected':''}" onclick="${onClickJS}">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;">
+        <div style="font-weight:800;font-size:14px;">${escapeHTML(m.name)}</div>
+        ${m.recommended ? `<span class="badge badge-top">Top ${m.rank}</span>` : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+        <span class="badge ${badgeClass}">${escapeHTML(m.fitLabel)}</span>
+        <span class="badge badge-moe">${escapeHTML(m.architecture)}: ${escapeHTML(m.activeParams)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:8px;">
+        ${escapeHTML(m.summary)}
+      </div>
+    </div>
+    <div style="font-size:11.5px;color:#cbd5e1;border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+      <span>💾 ${m.downloadSizeGB} GB on USB</span>
+      <span>⚡ ~${m.estTokensPerSec} tok/s</span>
+      ${m.installed ? `<span style="color:var(--green);font-weight:700;">✓ Installed (${escapeHTML(m.storageMode)})</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderWorkspace() {
+  const d = state.data;
+  const vault = d.vault;
+  const chats = vault.chats || [];
+
+  return `<div class="workspace">
+    <aside class="sidebar">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;font-weight:700;">👤 ${escapeHTML(vault.username)}</div>
+        <button class="btn" style="padding:4px 9px;font-size:11.5px;" onclick="logout()">Lock Vault</button>
+      </div>
+
+      <div class="nav-tabs">
+        <button class="nav-tab ${state.activeTab==='chat'?'active':''}" onclick="setTab('chat')">
+          <span>💬 AI Chat</span><span style="font-size:11px;color:var(--muted);">${chats.length}</span>
+        </button>
+        <button class="nav-tab ${state.activeTab==='models'?'active':''}" onclick="setTab('models')">
+          <span>🧠 Models & USB Space</span><span style="font-size:11px;color:var(--accent);">Top 5 + MoE</span>
+        </button>
+        <button class="nav-tab ${state.activeTab==='vault'?'active':''}" onclick="setTab('vault')">
+          <span>📚 Knowledge Vault</span><span style="font-size:11px;color:var(--muted);">${(vault.docs||[]).length} docs</span>
+        </button>
+        <button class="nav-tab ${state.activeTab==='settings'?'active':''}" onclick="setTab('settings')">
+          <span>⚙️ Settings & Firewall</span>
+        </button>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:700;">Encrypted Chats</span>
+        <button class="btn" style="padding:3px 8px;font-size:11.5px;" onclick="newChat()">+ New</button>
+      </div>
+
+      <div class="chat-list">
+        ${chats.map(c => `
+          <div class="chat-item ${c.id===state.activeChatId?'active':''}" onclick="selectChat('${escapeAttr(c.id)}')">
+            <span class="chat-item-title">${escapeHTML(c.title)}</span>
+            <span style="font-size:11px;opacity:0.65;" onclick="event.stopPropagation();deleteChat('${escapeAttr(c.id)}')" title="Delete chat">✕</span>
+          </div>
+        `).join('')}
+      </div>
+
+      <button class="btn" style="width:100%;justify-content:center;font-size:12px;" onclick="openSetupWizard()">
+        🧭 Re-run Hardware Setup Wizard
+      </button>
+    </aside>
+
+    <main class="main-pane">
+      ${state.activeTab === 'chat' ? renderChatPane()
+        : state.activeTab === 'models' ? renderModelsPane()
+        : state.activeTab === 'vault' ? renderVaultPane()
+        : renderSettingsPane()}
+    </main>
+  </div>`;
+}
+
+function renderChatPane() {
+  const d = state.data;
+  const vault = d.vault;
+  const models = d.models || [];
+  const chat = (vault.chats || []).find(c => c.id === state.activeChatId) || (vault.chats || [])[0];
+  const activeModelId = (chat && chat.model) || vault.settings.defaultModel || 'qwen3:4b';
+  const activeSpec = models.find(m => m.id === activeModelId) || models[0] || {};
+
+  return `
+    <div class="chat-header">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="font-size:12px;color:var(--muted);font-weight:700;">ACTIVE MODEL:</label>
+        <select class="input" style="width:auto;padding:6px 10px;font-size:13px;" onchange="changeChatModel(this.value)">
+          ${models.map(m => `<option value="${escapeAttr(m.id)}" ${m.id===activeModelId?'selected':''}>
+            ${m.recommended ? '⭐ ' : ''}${escapeHTML(m.name)} [${escapeHTML(m.architecture)} • ${escapeHTML(m.fitLabel)}]
+          </option>`).join('')}
+        </select>
+        ${activeSpec.executionPlan ? `<span class="badge badge-hybrid">${escapeHTML(activeSpec.executionPlan)}</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);">
+        <span>📚 Vault Docs: <strong>${(vault.docs||[]).length}</strong></span>
+      </div>
+    </div>
+
+    <div class="messages" id="messagesScroll">
+      ${chat ? chat.messages.map(m => `
+        <div class="msg ${m.role}">
+          <div class="msg-meta">
+            <strong>${m.role === 'user' ? escapeHTML(vault.username) : ('🤖 ' + escapeHTML(m.model || activeModelId))}</strong>
+            ${(m.sources || []).map(s => `<span class="badge badge-moe">${escapeHTML(s)}</span>`).join('')}
+          </div>
+          <div>${escapeHTML(m.content)}</div>
+        </div>
+      `).join('') : ''}
+      ${state.streaming ? `
+        <div class="msg assistant">
+          <div class="msg-meta"><strong>🤖 ${escapeHTML(activeModelId)} (Generating in Host RAM...)</strong></div>
+          <div id="streamingText">${escapeHTML(state.streamText || '▋')}</div>
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="composer">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" ${state.useWebSearch?'checked':''} onchange="toggleWebSearch(this.checked)" />
+          🌐 Include <strong>Privacy-Proxy Web Search</strong> for this prompt (requires Privacy Web mode)
+        </label>
+        <span>RAM-buffered • Writes to USB only after response completes</span>
+      </div>
+      <div class="composer-row">
+        <textarea id="chatInput" placeholder="Ask anything privately... (Press Enter to send, Shift+Enter for new line)" onkeydown="chatKeydown(event)"></textarea>
+        <button class="btn btn-primary" style="height:54px;padding:0 20px;" onclick="sendMessage()" ${state.streaming?'disabled':''}>
+          Send ↵
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderModelsPane() {
+  const d = state.data;
+  const hw = d.hardware || {};
+  const eng = d.engine || {};
+  const models = d.models || [];
+  const installed = d.installed || [];
+
+  return `<div class="pane-scroll">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+      <div>
+        <h2>🧠 AI Models, MoE Hybrid Offload & USB Storage Manager</h2>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px;">
+          Models are stored in <code>${escapeHTML(d.usbRoot)}/models</code> and shared across users on this USB stick.
+        </p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${eng.binaryInstalled
+          ? `<span class="badge badge-fast">✓ Ollama Engine Ready (${escapeHTML(eng.binarySource)})</span>`
+          : `<button class="btn btn-primary" onclick="installEngine()">⬇️ Install Portable Ollama Engine to USB</button>`}
+      </div>
+    </div>
+
+    <div id="livePullsContainer">${renderPullsHTML()}</div>
+
+    <!-- Custom Ollama Model Puller -->
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="flex:1;min-width:220px;">
+        <label style="font-size:11.5px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">PULL ANY OLLAMA MODEL TAG TO USB</label>
+        <input id="customModelTag" class="input" placeholder="e.g. qwen3:4b, llama3.2:3b, deepseek-v2:16b, mistral:7b" />
+      </div>
+      <div>
+        <label style="font-size:11.5px;color:var(--muted);font-weight:700;display:block;margin-bottom:5px;">STORAGE MODE</label>
+        <select id="customModelMode" class="input" style="width:auto;">
+          <option value="pinned">📌 Pinned to USB (Permanent)</option>
+          <option value="swap">🔄 Auto-Swap Slot (Replaces previous Swap model)</option>
+          <option value="session">⚡ Ephemeral Session (Deletes on Safe Eject)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="height:40px;" onclick="pullCustomModel()">📥 Download to USB</button>
+    </div>
+
+    <!-- Installed on USB -->
+    <h3 style="font-size:15px;margin-bottom:8px;">💾 Models Currently on This USB (${installed.length})</h3>
+    ${installed.length === 0 ? `<p style="font-size:13px;color:var(--muted);margin-bottom:18px;">No models downloaded yet. Pick any recommended model below!</p>` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:22px;">
+        ${installed.map(m => `
+          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong>${escapeHTML(m.name)}</strong>
+              <span style="font-size:12px;color:var(--muted);">${m.sizeGB} GB</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;justify-content:space-between;">
+              <select class="input" style="padding:5px 8px;font-size:12px;width:auto;" onchange="changeStorageMode('${escapeAttr(m.name)}', this.value)">
+                <option value="pinned" ${m.storageMode==='pinned'?'selected':''}>📌 Pinned (Permanent)</option>
+                <option value="swap" ${m.storageMode==='swap'?'selected':''}>🔄 Auto-Swap Slot</option>
+                <option value="session" ${m.storageMode==='session'?'selected':''}>⚡ Ephemeral Session</option>
+              </select>
+              <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteModel('${escapeAttr(m.name)}')">Delete</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+
+    <!-- Hardware-Ranked Catalog -->
+    <h3 style="font-size:15px;margin-bottom:8px;">
+      🏆 Hardware-Ranked Catalog for This PC (Tier ${hw.tier}: ${escapeHTML(hw.tierName)} — ${hw.ramGB} GB RAM)
+    </h3>
+    <div class="model-grid">
+      ${models.map(m => `
+        <div class="model-card" style="cursor:default;">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;">
+              <div style="font-weight:800;font-size:14px;">${escapeHTML(m.name)}</div>
+              ${m.recommended ? `<span class="badge badge-top">Top ${m.rank} for PC</span>` : ''}
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+              <span class="badge ${m.fitBadge==='fast'?'badge-fast':m.fitBadge==='hybrid'?'badge-hybrid':m.fitBadge==='playable'?'badge-playable':'badge-heavy'}">${escapeHTML(m.fitLabel)}</span>
+              <span class="badge badge-moe">${escapeHTML(m.architecture)}: ${escapeHTML(m.activeParams)}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">${escapeHTML(m.summary)}</div>
+            <div style="font-size:11.5px;color:#93c5fd;">Plan: ${escapeHTML(m.executionPlan)}</div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:11.5px;color:var(--muted);">${m.downloadSizeGB} GB • ~${m.estTokensPerSec} tok/s</span>
+            <div style="display:flex;gap:5px;">
+              <button class="btn" style="padding:4px 8px;font-size:11.5px;" onclick="quickPull('${escapeAttr(m.id)}','pinned')" title="Save permanently on USB">📌 Pin</button>
+              <button class="btn" style="padding:4px 8px;font-size:11.5px;" onclick="quickPull('${escapeAttr(m.id)}','swap')" title="Put in Auto-Swap slot">🔄 Swap</button>
+              <button class="btn" style="padding:4px 8px;font-size:11.5px;" onclick="quickPull('${escapeAttr(m.id)}','session')" title="Delete on exit">⚡ Session</button>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function renderVaultPane() {
+  const docs = (state.data.vault && state.data.vault.docs) || [];
+  return `<div class="pane-scroll">
+    <h2>📚 My Encrypted Knowledge Vault (Local RAG)</h2>
+    <p style="font-size:13px;color:var(--muted);margin:4px 0 16px;">
+      Drop private notes, code, or text files here. They are encrypted inside your personal <code>vault.enc</code> with AES-256-GCM and searched strictly in Host RAM when you ask questions.
+    </p>
+
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px;">
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <input id="docName" class="input" style="flex:1;" placeholder="Document title (e.g. Project_Contract.txt or Medical_Notes.md)" />
+        <label class="btn" style="cursor:pointer;">
+          📂 Import Text File
+          <input type="file" accept=".txt,.md,.json,.csv,.log,.py,.js,.go" style="display:none;" onchange="loadFileIntoVault(event)" />
+        </label>
+      </div>
+      <textarea id="docContent" class="input" rows="5" placeholder="Paste or import private document text here..."></textarea>
+      <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="addVaultDoc()">🔒 Encrypt & Save to Vault</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:15px;margin-bottom:10px;">Encrypted Documents in Your Vault (${docs.length})</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+      ${docs.map(d => `
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <strong>📄 ${escapeHTML(d.name)}</strong>
+              <span style="font-size:11px;color:var(--muted);">${d.sizeBytes} B</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);max-height:80px;overflow:hidden;">${escapeHTML(d.content.slice(0, 220))}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:8px;font-size:11px;color:var(--muted);">
+            <span>Added ${escapeHTML(d.addedAt)}</span>
+            <button class="btn btn-danger" style="padding:3px 8px;font-size:11px;" onclick="deleteVaultDoc('${escapeAttr(d.id)}')">Delete</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function renderSettingsPane() {
+  const d = state.data;
+  const s = d.vault.settings;
+  const log = d.networkLog || [];
+  return `<div class="pane-scroll">
+    <h2>⚙️ User Settings, Hybrid Memory & Firewall Audit Log</h2>
+    <p style="font-size:13px;color:var(--muted);margin:4px 0 16px;">
+      Personal instructions and memory settings for <strong>${escapeHTML(d.vault.username)}</strong>.
+    </p>
+
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:720px;margin-bottom:22px;">
+      <div class="field">
+        <label>Custom System Instructions (General Instructions for Your AI)</label>
+        <textarea id="setSysPrompt" class="input" rows="4">${escapeHTML(s.systemPrompt)}</textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Temperature (${s.temperature})</label>
+          <input id="setTemp" type="number" step="0.1" min="0" max="2" class="input" value="${s.temperature}" />
+        </div>
+        <div class="field">
+          <label>Context Window Tokens</label>
+          <input id="setCtx" type="number" step="1024" min="1024" max="65536" class="input" value="${s.contextLength}" />
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;cursor:pointer;">
+        <input type="checkbox" id="setHybrid" ${s.hybridOffload?'checked':''} />
+        Enable <strong>Hybrid GPU VRAM + System RAM Layer Offloading</strong>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;cursor:pointer;">
+        <input type="checkbox" id="setMMap" ${s.useMMap?'checked':''} />
+        Enable <strong>USB Memory-Mapped (mmap) Streaming</strong>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0 14px;cursor:pointer;">
+        <input type="checkbox" id="setRAG" ${s.useKnowledgeVault?'checked':''} />
+        Automatically include matching documents from <strong>My Knowledge Vault</strong>
+      </label>
+      <button class="btn btn-primary" onclick="saveUserSettings()">💾 Save Settings to Encrypted USB Vault</button>
+    </div>
+
+    <h3 style="font-size:15px;margin-bottom:8px;">🛡️ Live Network Firewall Audit Log (Mode: ${escapeHTML(d.networkMode.toUpperCase())})</h3>
+    <div style="background:#0d1424;border:1px solid var(--border);border-radius:10px;padding:12px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:12px;">
+      ${log.length === 0 ? `<div style="color:var(--muted);">Zero outbound network requests recorded in this session.</div>` :
+        log.slice().reverse().map(ev => `
+          <div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;">
+            <span>[${escapeHTML(ev.time)}] (${escapeHTML(ev.source)}) → <strong>${escapeHTML(ev.host)}</strong></span>
+            <span style="color:${ev.allowed?'var(--green)':'var(--red)'};font-weight:700;">${ev.allowed ? 'ALLOWED' : 'BLOCKED BY AIRLOCK'}</span>
+          </div>
+        `).join('')}
+    </div>
+  </div>`;
+}
+
+// Actions
+function switchAuthMode(m) { state.authMode = m; state.authError = ''; render(); }
+function selectUser(u) { state.selectedUser = u; render(); }
+
+async function submitAuth(e) {
+  e.preventDefault();
+  state.authError = '';
+  const username = document.getElementById('authUser').value.trim();
+  const password = document.getElementById('authPass').value;
+  try {
+    const ep = state.authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+    await api(ep, { username, password });
+    await bootstrap();
+  } catch (err) {
+    state.authError = err.message;
+    render();
+  }
+}
+
+async function logout() {
+  await api('/api/auth/logout', {});
+  state.activeChatId = '';
+  await bootstrap();
+}
+
+function selectSetupModel(id) { state.setupModel = id; render(); }
+function setSetupStorageMode(m) { state.setupStorageMode = m; render(); }
+function toggleShowAllModels() { state.showAllSetupModels = !state.showAllSetupModels; render(); }
+function openSetupWizard() { state.inSetup = true; render(); }
+
+async function finishSetup(pullNow) {
+  const sysEl = document.getElementById('setupSysPrompt');
+  const hybEl = document.getElementById('setupHybrid');
+  const mmapEl = document.getElementById('setupMMap');
+  await api('/api/setup/complete', {
+    defaultModel: state.setupModel,
+    storageMode: state.setupStorageMode,
+    systemPrompt: sysEl ? sysEl.value : '',
+    hybridOffload: hybEl ? hybEl.checked : true,
+    useMMap: mmapEl ? mmapEl.checked : true,
+    pullNow: pullNow,
+  });
+  state.inSetup = false;
+  await bootstrap();
+}
+
+function setTab(t) { state.activeTab = t; render(); }
+function selectChat(id) { state.activeChatId = id; render(); }
+
+async function newChat() {
+  const res = await api('/api/chats/new', { title: 'New Conversation' });
+  state.data.vault = res.vault;
+  state.activeChatId = res.chat.id;
+  state.activeTab = 'chat';
+  render();
+}
+
+async function deleteChat(id) {
+  const res = await api('/api/chats/delete', { chatId: id });
+  state.data.vault = res.vault;
+  if (state.activeChatId === id) {
+    state.activeChatId = (res.vault.chats[0] && res.vault.chats[0].id) || '';
+  }
+  render();
+}
+
+async function changeChatModel(modelId) {
+  const s = state.data.vault.settings;
+  s.defaultModel = modelId;
+  const res = await api('/api/settings', s);
+  state.data.vault = res.vault;
+  render();
+}
+
+function toggleWebSearch(v) {
+  state.useWebSearch = v;
+  if (v && state.data.networkMode !== 'web') {
+    setNetMode('web');
+  }
+}
+
+function chatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  if (state.streaming) return;
+  const input = document.getElementById('chatInput');
+  if (!input) return;
+  const content = input.value.trim();
+  if (!content) return;
+  input.value = '';
+
+  const vault = state.data.vault;
+  let chat = (vault.chats || []).find(c => c.id === state.activeChatId);
+  if (!chat) {
+    const created = await api('/api/chats/new', { title: content.slice(0, 36) });
+    state.data.vault = created.vault;
+    state.activeChatId = created.chat.id;
+    chat = created.chat;
+  }
+
+  chat.messages.push({ role: 'user', content, createdAt: new Date().toISOString() });
+  state.streaming = true;
+  state.streamText = '';
+  render();
+
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chatId: state.activeChatId,
+        model: chat.model || vault.settings.defaultModel || 'qwen3:4b',
+        content,
+        webSearch: state.useWebSearch,
+      }),
+    });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop() || '';
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        const payload = JSON.parse(part.slice(6));
+        if (payload.token) {
+          state.streamText += payload.token;
+          const el = document.getElementById('streamingText');
+          if (el) el.textContent = state.streamText;
+        }
+        if (payload.done && payload.vault) {
+          state.data.vault = payload.vault;
+          state.data.sync = payload.sync;
+        }
+      }
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    state.streaming = false;
+    state.streamText = '';
+    updateTopBar();
+    render();
+  }
+}
+
+async function setNetMode(mode) {
+  const res = await api('/api/network/mode', { mode });
+  state.data.networkMode = res.networkMode;
+  state.data.networkLog = res.networkLog;
+  updateTopBar();
+  if (state.activeTab === 'settings') render();
+}
+
+async function rescanHardware() {
+  const res = await api('/api/hardware/rescan', {});
+  state.data.hardware = res.hardware;
+  state.data.models = res.models;
+  updateTopBar();
+  render();
+}
+
+async function quickPull(model, storageMode) {
+  try {
+    if (state.data.networkMode === 'airlock') {
+      await setNetMode('hub');
+    }
+    await api('/api/models/pull', { model, storageMode });
+    await pollStatus();
+    setTimeout(bootstrap, 900);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function pullCustomModel() {
+  const tag = document.getElementById('customModelTag').value.trim();
+  const mode = document.getElementById('customModelMode').value;
+  if (!tag) return;
+  await quickPull(tag, mode);
+}
+
+async function changeStorageMode(model, storageMode) {
+  const res = await api('/api/models/mode', { model, storageMode });
+  state.data.installed = res.installed;
+  state.data.models = res.models;
+  render();
+}
+
+async function deleteModel(model) {
+  const res = await api('/api/models/delete', { model });
+  state.data.installed = res.installed;
+  state.data.models = res.models;
+  render();
+}
+
+async function installEngine() {
+  try {
+    if (state.data.networkMode === 'airlock') {
+      await setNetMode('hub');
+    }
+    await api('/api/engine/install', {});
+    await pollStatus();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function loadFileIntoVault(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const nameInput = document.getElementById('docName');
+  if (nameInput && !nameInput.value) nameInput.value = f.name;
+  const r = new FileReader();
+  r.onload = () => {
+    document.getElementById('docContent').value = r.result;
+  };
+  r.readAsText(f);
+}
+
+async function addVaultDoc() {
+  const name = document.getElementById('docName').value.trim();
+  const content = document.getElementById('docContent').value.trim();
+  if (!name || !content) return;
+  const res = await api('/api/vault/docs/add', { name, content });
+  state.data.vault = res.vault;
+  state.data.sync = res.sync;
+  updateTopBar();
+  render();
+}
+
+async function deleteVaultDoc(id) {
+  const res = await api('/api/vault/docs/delete', { id });
+  state.data.vault = res.vault;
+  state.data.sync = res.sync;
+  updateTopBar();
+  render();
+}
+
+async function saveUserSettings() {
+  const s = Object.assign({}, state.data.vault.settings, {
+    systemPrompt: document.getElementById('setSysPrompt').value,
+    temperature: parseFloat(document.getElementById('setTemp').value) || 0.7,
+    contextLength: parseInt(document.getElementById('setCtx').value, 10) || 4096,
+    hybridOffload: document.getElementById('setHybrid').checked,
+    useMMap: document.getElementById('setMMap').checked,
+    useKnowledgeVault: document.getElementById('setRAG').checked,
+  });
+  const res = await api('/api/settings', s);
+  state.data.vault = res.vault;
+  state.data.sync = res.sync;
+  updateTopBar();
+  render();
+}
+
+async function toggleSimulateYank() {
+  state.simYank = !state.simYank;
+  const res = await api('/api/usb/simulate-yank', { unplugged: state.simYank });
+  state.data.sync = res.sync;
+  updateTopBar();
+}
+
+async function reconnectUSB() {
+  state.simYank = false;
+  const res = await api('/api/usb/flush', {});
+  state.data.sync = res.sync;
+  updateTopBar();
+}
+
+async function safeEject() {
+  try {
+    await api('/api/usb/eject', {});
+    await bootstrap();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function reconnectAfterEject() {
+  location.reload();
+}
+
+function escapeHTML(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function escapeAttr(s) { return escapeHTML(s).replace(/'/g, '&#39;'); }
+
+bootstrap();
+</script>
+</body>
+</html>
