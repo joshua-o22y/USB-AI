@@ -1,0 +1,42 @@
+name: Build Universal USB-AI Bundle
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-usb-stick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Run Unit Tests
+        run: go test -v ./...
+      - name: Build Cross-OS USB Stick Bundle
+        run: |
+          chmod +x scripts/build-usb.sh
+          ./scripts/build-usb.sh ./dist/USB-AI-Stick
+          cd ./dist/USB-AI-Stick
+          zip -r ../USB-AI-Universal-Stick.zip . -x "*.DS_Store"
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: USB-AI-Universal-Stick
+          path: ./dist/USB-AI-Universal-Stick.zip
+      - name: Publish Latest Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: "USB-AI v0.1.0 — Ready-to-Copy USB Stick (Windows, macOS, Linux)"
+          body: |
+            Download **USB-AI-Universal-Stick.zip**, extract it onto any **exFAT**-formatted USB drive (or any folder on your PC), and launch:
+            - **Windows:** Double-click `Start-USB-AI.exe`
+            - **macOS:** Double-click `Start-USB-AI.command`
+            - **Linux:** Run `./start-usb-ai.sh`
+          files: ./dist/USB-AI-Universal-Stick.zip
